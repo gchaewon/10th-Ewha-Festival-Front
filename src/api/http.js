@@ -1,3 +1,13 @@
 import axios from "axios";
 
-export default http = axios.create({ baseURL: "http://localhost:3000/" });
+export const http = axios.create({
+  baseURL: "https://api.rewha2022.com",
+});
+
+http.defaults.withCredentials = true;
+
+const token = JSON.parse(localStorage.getItem("token")) ?? false;
+
+http.defaults.headers.common["Authorization"] = token
+  ? `Bearer ${token}`
+  : null;

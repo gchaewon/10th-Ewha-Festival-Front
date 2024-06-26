@@ -1,0 +1,45 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img:focus {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@font-face {
+  font-family: "Wargika";
+  src: url("./Wargika-vmVYA.woff") format("woff");
+}
+
+@font-face {
+  font-family: "PyeongChangPeaceBold";
+
+  src: local("PyeongChangPeaceBold"),
+    url("../styles/font/PyeongChangPeaceBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "PyeongChangPeace";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2206-02@1.0/PyeongChangPeace-Light.woff2")
+    format("woff2");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "PyeongChang";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2206-02@1.0/PyeongChang-Bold.woff2")
+    format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "PyeongChangPeaceBold";
+  src: url("../styles/font/PyeongChangPeaceBold.woff2") format("woff2");
+}

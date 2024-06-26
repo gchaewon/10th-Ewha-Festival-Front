@@ -1,26 +1,103 @@
 import styled, { css } from "styled-components";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../../redux/store";
+import { setPage } from "../../redux/pageSlice";
 
+//컴포넌트
 import { PyeongChang_Peace, Pretendard } from "../../components/Text";
 import LocationBtn from "../../components/Category/LocationBtn";
 import Footer from "../../components/Footer/Footer";
+import { GetKeywordBooth, LikeBooth, UnLikeBooth } from "../../api/booth";
+import Pagination from "../../components/Category/Pagination";
+import SideBar from "../../components/SideBar";
+
+// 데이터
 import { locationData } from "../../_mock/locations";
 import { dayData } from "../../_mock/dayData";
-import { boothData } from "../../_mock/boothData";
-
-import back from "../../images/navbar/back.svg";
+import { categoryData } from "../../_mock/categoryData";
+import { boothMaps } from "../../_mock/boothMap";
+// 이미지
 import search from "../../images/navbar/search.svg";
-import map from "../../images/map.svg";
+import hamburger from "../../images/main/hamburger.svg";
 import greenheart from "../../images/greenheart.svg";
 import heart from "../../images/heart.svg";
-import { useEffect } from "react";
+import booththumnail from "../../images/default.png";
 
 const Category = () => {
-  const [days, setDays] = useState(dayData); // 날짜
-  const [locations, setLocations] = useState(locationData); //장소
-  const [booths, setBooths] = useState(boothData);
+  const { day, location, page } = useAppSelector(state => state.page);
 
-  //날짜 선택
+  const dispatch = useAppDispatch();
+
+  const [days, setDays] = useState(dayData); // 요일들
+  const [locations, setLocations] = useState(locationData); // 장소들
+
+  const [pickedPage, setpickedPage] = useState(parseInt(page)); // 선택된 페이지 넘버
+  const [pickedDay, setPickedDay] = useState(day); // 선택 된 요일
+  const [pickedLocation, setPickedLocation] = useState(location); // 선택된 장소 (한글)
+  const [pickedMap, setPickedMap] = useState(location); // 선택된 지도
+
+  const [booths, setBooths] = useState(categoryData.data); // 부스 목록
+  const [length, setLength] = useState(0);
+
+  var selectLocationId = null;
+  locations.map(lo => {
+    if (location === lo.name) {
+      selectLocationId = lo.id;
+    }
+  });
+
+  //첫 get api
+  useEffect(() => {
+    dispatch(
+      setPage({ day: pickedDay, location: pickedLocation, page: pickedPage }),
+    );
+
+    selectLocation(selectLocationId); // 전에 눌렀던 장소 버튼
+    selectDay(parseInt(day)); // 전에 눌렀던 요일 버튼
+
+    GetKeywordBooth(pickedDay, pickedLocation, pickedPage)
+      .then(res => {
+        console.log("조회 결과", res);
+        setBooths(res.data.data);
+        setLength(res.data.total);
+      })
+      .catch(err => {
+        console.log(
+          "부스 조회 실패 =>",
+          pickedDay,
+          pickedLocation,
+          pickedPage,
+          err,
+        );
+
+        if (err.response.data.detail === "페이지가 유효하지 않습니다.") {
+          setpickedPage(1);
+        }
+      });
+  }, []);
+
+  //날짜 또는 장소 선택 바뀌면 get api 실행
+  useEffect(() => {
+    dispatch(
+      setPage({ day: pickedDay, location: pickedLocation, page: pickedPage }),
+    );
+
+    GetKeywordBooth(pickedDay, pickedLocation, pickedPage)
+      .then(res => {
+        setBooths(res.data.data);
+        setLength(res.data.total);
+      })
+      .catch(err => {
+        console.log("부스 조회 실패", err, pickedDay, pickedLocation);
+
+        if (err.response.data.detail === "페이지가 유효하지 않습니다.") {
+          setpickedPage(1);
+        }
+      });
+  }, [pickedDay, pickedLocation, pickedPage]);
+
+  /**요일 선택 : 요일 버튼 ui 변경 + 선택된 요일 변경*/
   const selectDay = id => {
     setDays(
       days.map(day =>
@@ -29,8 +106,16 @@ const Category = () => {
           : { ...day, selected: false },
       ),
     );
+
+    // 선택된 날짜 바꾸기
+    days.map(day => {
+      if (id === day.id) {
+        setPickedDay(id);
+      }
+    });
   };
-  // 장소 선택
+
+  /** 장소 선택 : 장소 버튼 ui 변경 + 선택된 장소 변경 */
   const selectLocation = id => {
     setLocations(
       locations.map(loc =>
@@ -39,35 +124,67 @@ const Category = () => {
           : { ...loc, selected: false },
       ),
     );
+
+    // 선택된 장소 바꾸기
+    locations.map(lo => {
+      if (id === lo.id) {
+        setPickedLocation(locationData[id - 1].name);
+        setPickedMap(id);
+      }
+    });
   };
 
-  // 좋아요 클릭
+  /** 좋아요 클릭 : api 실행 -> 부스 목록 다시 get */
   const Like = id => {
-    setBooths(
-      booths.map(booth =>
-        booth.id === id ? { ...booth, is_liked: true } : { ...booth },
-      ),
-    );
-    console.log("좋아요", id);
-    // 좋아요 요청 보내기
-    // 업데이트
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      // 하트 ui 수정
+      setBooths(
+        booths.map(booth =>
+          booth.id === id ? { ...booth, is_liked: true } : { ...booth },
+        ),
+      );
+      // 좋아요 api 요청 보내기
+      LikeBooth(id)
+        .then(res => console.log(res))
+        .catch(err => console.log(err));
+    } else {
+      alert("로그인이 필요합니다.");
+    }
   };
 
+  /**좋아요 취소 : api 실행 -> 부스 목록 다시 get*/
   const unLike = id => {
+    // 하트 ui 수정
     setBooths(
       booths.map(booth =>
         booth.id === id ? { ...booth, is_liked: false } : { ...booth },
       ),
     );
-    console.log("좋아요 삭제", id);
-    // 좋아요 삭제
-    // 업데이트
+    // 좋아요 삭제 api
+    UnLikeBooth(id)
+      .then(res => console.log(res))
+      .catch(err => console.log(err));
   };
+
+  const navigate = useNavigate();
+
+  const Detail = id => {
+    navigate(`/category/detail/${id}`);
+  };
+
+  const [sideBar, setSideBar] = useState(false);
 
   return (
     <Wrapper>
       <Navbar>
-        <Back src={back} />
+        <img
+          src={hamburger}
+          onClick={() => {
+            setSideBar(true);
+          }}
+        />
 
         <PyeongChang_Peace
           size="22px"
@@ -79,10 +196,14 @@ const Category = () => {
           <p style={{ color: "var(--green2)" }}>스&nbsp;</p>
           카테고리
         </PyeongChang_Peace>
-        <Search src={search} />
+        <Link to="/search">
+          <Search src={search} />
+        </Link>
       </Navbar>
 
-      <Map src={map} />
+      {sideBar ? <SideBar setSideBar={setSideBar} /> : null}
+
+      <Map src={boothMaps[pickedMap]} />
 
       <DayBox>
         {days.map(day => {
@@ -107,56 +228,87 @@ const Category = () => {
       <Hr />
 
       <LocationBox>
-        <div style={{ display: "flex" }}>
-          {locations.map(loc => {
-            if (loc.selected === true) {
-              return (
-                <LocationBtn
-                  key={loc.id}
-                  onClick={() => selectLocation(loc.id)}
-                  selected
-                >
-                  {loc.name}
-                </LocationBtn>
-              );
-            } else {
-              return (
-                <LocationBtn
-                  key={loc.id}
-                  onClick={() => selectLocation(loc.id)}
-                >
-                  {loc.name}
-                </LocationBtn>
-              );
-            }
-          })}
-        </div>
+        {locations.map(loc => {
+          if (loc.selected === true) {
+            return (
+              <LocationBtn
+                key={loc.id}
+                onClick={() => selectLocation(loc.id)}
+                selected
+              >
+                {loc.name}
+              </LocationBtn>
+            );
+          } else {
+            return (
+              <LocationBtn key={loc.id} onClick={() => selectLocation(loc.id)}>
+                {loc.name}
+              </LocationBtn>
+            );
+          }
+        })}
       </LocationBox>
 
       <BoothBox>
         <Pretendard color="var(--gray3)" weight="500" size="12px">
-          총 6개의 부스
+          총 {length}개의 부스
         </Pretendard>
 
         {booths.map(b => {
+          const description = b.description?.substr(0, 27);
+
+          if (description?.includes("\n")) {
+            var info = description.split("\n")[0];
+          } else {
+            var info = description;
+          }
+
           return (
             <Booth key={b.id}>
-              <BoothImg />
-              <BootInfo>
-                <p className="num">{b.num}</p>
-                <p className="name">{b.name}</p>
-                <p className="info">{b.info}</p>
-              </BootInfo>
-
-              {b.is_liked ? (
-                <Heart src={greenheart} onClick={() => unLike(b.id)} />
+              {b.thumnail == "" ? (
+                <BoothImg src={booththumnail} onClick={() => Detail(b.id)} />
               ) : (
-                <Heart src={heart} onClick={() => Like(b.id)} />
+                <BoothImg src={b.thumnail} onClick={() => Detail(b.id)} />
+              )}
+              <BootInfo onClick={event => Detail(b.id)}>
+                <p className="num">{b.number}</p>
+                <p className="name">{b.name.substr(0, 13)}</p>
+                <p className="info">{info}</p>
+              </BootInfo>
+              {b.is_liked ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Heart src={greenheart} onClick={() => unLike(b.id)} />
+                  <HeartBox onClick={event => Detail(b.id)}></HeartBox>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Heart src={heart} onClick={() => Like(b.id)} />
+                  <HeartBox onClick={event => Detail(b.id)}></HeartBox>
+                </div>
               )}
             </Booth>
           );
         })}
       </BoothBox>
+
+      <Pagination
+        total={length}
+        limit={10}
+        page={pickedPage}
+        setPage={setpickedPage}
+      />
 
       <Footer />
     </Wrapper>
@@ -165,13 +317,18 @@ const Category = () => {
 
 export default Category;
 
+const HeartBox = styled.div`
+  width: 50px;
+  height: 54px;
+`;
+
 const Heart = styled.img`
   position: absolute;
   top: 16px;
   right: 14px;
 `;
 
-const BoothImg = styled.div`
+const BoothImg = styled.img`
   background-color: #f6f6f6;
   margin-right: 12px;
   width: 89px;
@@ -199,7 +356,6 @@ const BootInfo = styled.div`
   }
 
   .info {
-    letter-spacing: -2px;
     font-size: 11px;
     font-style: "Pretendard-Regular";
     font-weight: 400;
@@ -230,9 +386,10 @@ const BoothBox = styled.div`
 `;
 
 const LocationBox = styled.div`
-  display: flex;
-  justify-content: center;
-
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-row-gap: 12px;
   margin: 0 auto 0 auto;
 
   width: 345px;
@@ -304,7 +461,7 @@ const Day = styled.div`
 `;
 
 const Map = styled.img`
-  margin: 8px 39px 23px 30px;
+  margin: 8px 10px 23px 10px;
 `;
 
 const Wrapper = styled.div`
@@ -334,4 +491,6 @@ const Back = styled.img`
 const Search = styled.img`
   width: 17px;
   height: 17px;
+
+  margin-top: 3px;
 `;
